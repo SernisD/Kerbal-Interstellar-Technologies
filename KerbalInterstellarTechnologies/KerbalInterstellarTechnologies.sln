@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30523.141
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KerbalInterstellarTechnologies", "KerbalInterstellarTechnologies.csproj", "{D55A595D-8637-4DD1-A9B7-88D1DD2D2FEC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KIT-Tests", "..\KIT-Tests\KIT-Tests.csproj", "{018D763D-298E-4CA5-BC37-5E18B324E6C9}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D55A595D-8637-4DD1-A9B7-88D1DD2D2FEC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D55A595D-8637-4DD1-A9B7-88D1DD2D2FEC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D55A595D-8637-4DD1-A9B7-88D1DD2D2FEC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D55A595D-8637-4DD1-A9B7-88D1DD2D2FEC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{018D763D-298E-4CA5-BC37-5E18B324E6C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{018D763D-298E-4CA5-BC37-5E18B324E6C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{018D763D-298E-4CA5-BC37-5E18B324E6C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{018D763D-298E-4CA5-BC37-5E18B324E6C9}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D0C57D77-C182-4B61-AA30-C3A9CB765485}
+	EndGlobalSection
+EndGlobal
