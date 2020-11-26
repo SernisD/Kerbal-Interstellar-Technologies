@@ -6,21 +6,23 @@ namespace KerbalInterstellarTechnologies.FuelStorage
 {
     public static class KITCryostatBoiloff
     {
-        public static Func<PartResource, double, bool, bool> BoilOffCalculator(IResourceInterface resourceInterface, KITCryostatConfig config, ICheatOptions cheats)
+        public static Action<PartResource, double> BoilOffCalculator(IResourceInterface resourceInterface, KITCryostatConfig config, ICheatOptions cheats)
         {
-            return (PartResource resource, double externalTemp, bool previousPowerMet) =>
+            return (PartResource resource, double externalTemp) =>
             {
-                if (cheats.IgnoreMaxTemperature) return true;
+                // config.previousPowerMet etc
+
+                if (cheats.IgnoreMaxTemperature) return;
 
                 if (double.IsNaN(externalTemp) || double.IsInfinity(externalTemp))
                 {
                     Debug.Log($"[KITCryostatBoiloff] externalTemp is either NaN or Infinity");
                     // Since we're doing nothing, the power requirements have been met.
-                    return true;
+                    return;
                 }
 
                 // Empty tanks don't need cooling
-                if (resource.amount < 0.0000001) return true;
+                if (resource.amount < 0.0000001) return;
 
                 var atmosphereModifier = 1; // var atmosphereModifier = convectionMod == -1 ? 0 : convectionMod + part.atmDensity / (convectionMod + 1);
 
@@ -36,11 +38,8 @@ namespace KerbalInterstellarTechnologies.FuelStorage
                     consumed += resourceInterface.Consume("ElectricCharge", currentPowerReq);
                 }
 
-                if (previousPowerMet == true && consumed < currentPowerReq) return false;
+                // and other stuff.
 
-                
-
-                return true;
             };
         }
     }
@@ -74,7 +73,7 @@ namespace KerbalInterstellarTechnologies.FuelStorage
         [KSPField]
         public double convectionMod = 1;
 
-        private Func<PartResource, double, bool, bool> BoilOffCalculator;
+        private Action<PartResource, double> BoilOffCalculator;
 
         public override void OnStart(PartModule.StartState state)
         {
@@ -187,7 +186,14 @@ namespace KerbalInterstellarTechnologies.FuelStorage
                 }
             }
 
-            previousPowerMet = BoilOffCalculator(part.Resources[resourceName], part.temperature, previousPowerMet);
+            BoilOffCalculator(part.Resources[resourceName], part.temperature);
         }
+
+        // For Kerbalism background processing
+        //   - extract the config values from the ProtoPartModule
+        //   - put it in the Config struct
+        //   - call the boiloff calculator
+        //   - store changes if needed to the proto part module
+
     }
 }
