@@ -63,6 +63,9 @@ namespace KerbalInterstellarTechnologies
         string KITPartName();
     }
 
+    /// <summary>
+    /// Marks a IKITMod that can be called as needed to produce resources for the vessel.
+    /// </summary>
     public interface IKITVariableSupplier
     {
         /// <summary>
@@ -71,6 +74,12 @@ namespace KerbalInterstellarTechnologies
         /// <returns>Returns a list of strings for the resources it can provide</returns>
         string[] ResourcesProvided();
 
+        /// <summary>
+        /// Checks to see if the requested resource can be provided.
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="requestedAmount"></param>
+        /// <returns></returns>
         double ProvideResource(string name, double requestedAmount);
     }
 

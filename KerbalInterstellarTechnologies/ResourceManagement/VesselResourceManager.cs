@@ -166,8 +166,6 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
             bool checkVisited = false;
             int index = 0;
 
-            inExecuteKITModules = true;
-
             fixedDeltaTime = deltaTime;
             visited.Clear();
 
@@ -196,7 +194,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
                     refreshActiveModules();
                 }
             }
-            inExecuteKITModules = false;
+            
         }
 
         /// <summary>
@@ -219,6 +217,8 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
             if (needsRefresh) refreshActiveModules();
             if (hasKITModules == false) return;
 
+            inExecuteKITModules = true;
+
             if (catchUpNeeded)
             {
                 Debug.Log($"[KITResourceManager] catching up with a delta of {deltaTime}");
@@ -229,6 +229,10 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
             }
 
             ExecuteKITModules(TimeWarp.fixedDeltaTime);
+
+            // And once all that is done, check how much EC is missing from the vessel, and generate it.
+
+            inExecuteKITModules = false;
         }
 
         /// <summary>
@@ -257,7 +261,12 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
         /// <param name="amount">Amount you are providing</param>
         void IResourceManager.ProduceResource(string name, double amount)
         {
-            if (!inExecuteKITModules) return;
+            if (!inExecuteKITModules)
+            {
+                Debug.Log("[KITResourceManager.ProduceResource] don't do this.");
+                return;
+            }
+
             if (name == ResourceSettings.WasteHeat && myCheatOptions.IgnoreMaxTemperature) return;
             throw new NotImplementedException();
         }
@@ -275,7 +284,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
 
             [KSPField(guiActive = true, guiActiveEditor = false, guiName = "Destroy"), UI_Toggle(disabledText = "Off", enabledText = "On", affectSymCounterparts = UI_Scene.All)] public bool destroyInUpdate = false;
 
-            int explosionCountdown = 20;
+            int explosionCountdown = 5;
 
             public void KITFixedUpdate(double deltaTime)
             {

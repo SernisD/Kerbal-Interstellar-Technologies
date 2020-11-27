@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using KerbalInterstellarTechnologies;
+using System.Reflection;
 
 namespace KIT_Tests.ResourceManager
 {
@@ -20,18 +21,6 @@ namespace KIT_Tests.ResourceManager
 
             kitrm.Vessel.parts = new List<Part>();
             return kitrm;
-        }
-
-        private Part NewTestPart(PartModule[] modules)
-        {
-            var ret = new Part();
-            ret.partName = "Test Part";
-            // foreach (var s in moduleNames) ret.AddModule(s);
-
-            var fi = ret.Assembly;
-
-
-            return ret;
         }
 
         [TestMethod]
@@ -80,11 +69,11 @@ namespace KIT_Tests.ResourceManager
     public class VRMPriorityPartModule : PartModule, IKITMod
     {
         public int Priority;
-        Action<double> CallBack;
+        Action<IResourceManager> CallBack;
         public string PartName;
 
 
-        public VRMPriorityPartModule(int priority, string partName, Action<double> callback)
+        public VRMPriorityPartModule(int priority, string partName, Action<IResourceManager> callback)
         {
             Priority = priority;
             CallBack = callback;
@@ -96,5 +85,7 @@ namespace KIT_Tests.ResourceManager
         public string KITPartName() => PartName;
 
         public int ResourceProcessPriority() => Priority;
+
+        public void KITFixedUpdate(IResourceManager resMan) => CallBack(resMan);
     }
 }
