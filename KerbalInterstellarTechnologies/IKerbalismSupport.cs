@@ -15,7 +15,7 @@ namespace KerbalInterstellarTechnologies
         string ResourceUpdate(Dictionary<string, double> availableResources, List<KeyValuePair<string, double>> resourceChangeRequest);
     }
 
-    public class KerbalismResourceInterface : IResourceInterface
+    public class KerbalismResourceInterface // : IResourceInterface
     {
         public Dictionary<string, double> available;
         public List<KeyValuePair<string, double>> consumed;

@@ -4,48 +4,51 @@ using UnityEngine;
 
 namespace KerbalInterstellarTechnologies.FuelStorage
 {
+    /*
     public static class KITCryostatBoiloff
-    {
-        public static Action<PartResource, double> BoilOffCalculator(IResourceInterface resourceInterface, KITCryostatConfig config, ICheatOptions cheats)
-        {
-            return (PartResource resource, double externalTemp) =>
-            {
-                // config.previousPowerMet etc
+     {
 
-                if (cheats.IgnoreMaxTemperature) return;
+     public static Action<PartResource, double> BoilOffCalculator(IResourceInterface resourceInterface, KITCryostatConfig config)
+     {
+         return (PartResource resource, double externalTemp) =>
+         {
+             // config.previousPowerMet etc
 
-                if (double.IsNaN(externalTemp) || double.IsInfinity(externalTemp))
-                {
-                    Debug.Log($"[KITCryostatBoiloff] externalTemp is either NaN or Infinity");
-                    // Since we're doing nothing, the power requirements have been met.
-                    return;
-                }
+             if (cheats.IgnoreMaxTemperature) return;
 
-                // Empty tanks don't need cooling
-                if (resource.amount < 0.0000001) return;
+             if (double.IsNaN(externalTemp) || double.IsInfinity(externalTemp))
+             {
+                 Debug.Log($"[KITCryostatBoiloff] externalTemp is either NaN or Infinity");
+                 // Since we're doing nothing, the power requirements have been met.
+                 return;
+             }
 
-                var atmosphereModifier = 1; // var atmosphereModifier = convectionMod == -1 ? 0 : convectionMod + part.atmDensity / (convectionMod + 1);
+             // Empty tanks don't need cooling
+             if (resource.amount < 0.0000001) return;
 
-                var temperatureModifier = Math.Max(0, externalTemp - config.boilOffTemp) / 300; //273.15;
-                var environmentFactor = atmosphereModifier * temperatureModifier;
+             var atmosphereModifier = 1; // var atmosphereModifier = convectionMod == -1 ? 0 : convectionMod + part.atmDensity / (convectionMod + 1);
 
-                var currentPowerReq = config.powerReqKW * 0.2 * environmentFactor * config.powerReqMult;
+             var temperatureModifier = Math.Max(0, externalTemp - config.boilOffTemp) / 300; //273.15;
+             var environmentFactor = atmosphereModifier * temperatureModifier;
 
-                double consumed = cheats.InfiniteElectricity ? currentPowerReq : 0;
+             var currentPowerReq = config.powerReqKW * 0.2 * environmentFactor * config.powerReqMult;
 
-                if (consumed < currentPowerReq)
-                {
-                    consumed += resourceInterface.Consume("ElectricCharge", currentPowerReq);
-                }
+             double consumed = cheats.InfiniteElectricity ? currentPowerReq : 0;
 
-                // and other stuff.
+             if (consumed < currentPowerReq)
+             {
+                 consumed += resourceInterface.Consume("ElectricCharge", currentPowerReq);
+             }
 
-            };
-        }
-    }
+             // and other stuff.
 
-    public class KITCryostat : PartModule
-    {
+         };
+     }
+     */
+
+
+public class KITCryostat : PartModule
+{
         private bool kerbalismDetected;
         private static string kerbalismName = "Cryostat";
 
@@ -80,11 +83,12 @@ namespace KerbalInterstellarTechnologies.FuelStorage
             base.OnStart(state);
             if (state == StartState.Editor) return;
 
+            /*
             BoilOffCalculator = KITCryostatBoiloff.BoilOffCalculator(
                 new StockResourceInterface(part),
                 new KITCryostatConfig(this),
                 RealCheatOptions.Instance()
-            );
+            ); */
         }
 
         private bool recentlyConfigured;
@@ -186,7 +190,7 @@ namespace KerbalInterstellarTechnologies.FuelStorage
                 }
             }
 
-            BoilOffCalculator(part.Resources[resourceName], part.temperature);
+            // BoilOffCalculator(part.Resources[resourceName], part.temperature);
         }
 
         // For Kerbalism background processing

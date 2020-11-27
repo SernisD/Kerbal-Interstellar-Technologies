@@ -3,7 +3,7 @@ using KerbalInterstellarTechnologies;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace KIT_Tests
+namespace KIT_Tests.FuelStorage
 {
     [TestClass]
     public class TestKITCryostat

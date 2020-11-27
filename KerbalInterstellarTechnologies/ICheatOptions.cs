@@ -32,14 +32,17 @@ namespace KerbalInterstellarTechnologies
         public bool IgnoreAgencyMindsetOnContracts => CheatOptions.IgnoreAgencyMindsetOnContracts;
 
         private static RealCheatOptions instance;
-        public static RealCheatOptions Instance()
+        public static RealCheatOptions Instance
         {
-            if(instance == null)
+            get
             {
-                instance = new RealCheatOptions();
-            }
+                if (instance == null)
+                {
+                    instance = new RealCheatOptions();
+                }
 
-            return instance;
+                return instance;
+            }
         }
     }
 
