@@ -62,7 +62,9 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
             currentResources[resource] -= tmp;
             if (obtainedAmount >= modifiedAmount) return wanted;
 
-            obtainedAmount = CallVariableSuppliers(resource, wanted, obtainedAmount, modifiedAmount);
+            // Convert to seconds
+            obtainedAmount = wanted * (obtainedAmount / modifiedAmount);
+            obtainedAmount = CallVariableSuppliers(resource, obtainedAmount, wanted); 
 
             //return obtainedAmount;
 
@@ -168,10 +170,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
                 }
                 catch (Exception ex)
                 {
-                    if (UseThisToHelpWithTesting)
-                    {
-                        throw;
-                    }
+                    if (UseThisToHelpWithTesting) throw;
                     else
                     {
                         // XXX - part names and all that.
@@ -191,7 +190,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
             if (resourceMaxAmounts.ContainsKey(ResourceName.ElectricCharge) && resourceAmounts.ContainsKey(ResourceName.ElectricCharge))
             {
                 double fillBattery = resourceMaxAmounts[ResourceName.ElectricCharge] - resourceAmounts[ResourceName.ElectricCharge];
-                resourceAmounts[ResourceName.ElectricCharge] += CallVariableSuppliers(ResourceName.ElectricCharge, fillBattery, 0, fillBattery * fixedDeltaTime);
+                resourceAmounts[ResourceName.ElectricCharge] += CallVariableSuppliers(ResourceName.ElectricCharge, 0, fillBattery);
             }
 
             currentResources = null;
@@ -200,7 +199,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
 
         HashSet<IKITVariableSupplier> tappedOutMods = new HashSet<IKITVariableSupplier>(128);
 
-        private double CallVariableSuppliers(ResourceName resource, double originalAmount, double obtainedAmount, double modifiedAmount)
+        private double CallVariableSuppliers(ResourceName resource, double obtainedAmount, double originalAmount)
         {
             if (variableSupplierModules.ContainsKey(resource) == false) return 0;
 
@@ -220,7 +219,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
                     KITMod.KITFixedUpdate(this);
                 }
 
-                double perSecondAmount = originalAmount * (1 - (obtainedAmount / modifiedAmount));
+                double perSecondAmount = originalAmount * (1 - (obtainedAmount / originalAmount));
 
                 try
                 {
@@ -233,13 +232,13 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
                     Debug.Log($"[KITResourceManager.callVariableSuppliers] calling KITMod {KITMod.KITPartName()} resulted in {ex.ToString()}");
                 }
 
-                var tmp = Math.Min(currentResources[resource], (modifiedAmount - obtainedAmount));
+                var tmp = Math.Min(currentResources[resource], perSecondAmount);
                 currentResources[resource] -= tmp;
                 obtainedAmount += tmp;
 
                 modsCurrentlyRunning.Remove(KITMod);
 
-                if (obtainedAmount >= modifiedAmount) return modifiedAmount;
+                if (obtainedAmount >= originalAmount) return originalAmount;
             }
 
             return obtainedAmount;

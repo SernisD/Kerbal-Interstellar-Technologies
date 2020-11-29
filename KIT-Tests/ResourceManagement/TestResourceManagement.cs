@@ -228,6 +228,38 @@ namespace KIT_Tests.ResourceManagement
             Assert.IsTrue(empty[ResourceName.ElectricCharge] == 5, $"did not fill battery - it is {empty[ResourceName.ElectricCharge]}");
         }
 
+        [TestMethod]
+        public void TestFixedDeltaTime()
+        {
+            var tvr = new TestVesselResources();
+            tvr.vesselModified = true;
 
+            var resources = new Dictionary<ResourceName, double>();
+
+            var _rm = new KerbalInterstellarTechnologies.ResourceManagement.ResourceManager(tvr, RealCheatOptions.Instance);
+            _rm.UseThisToHelpWithTesting = true;
+            var rm = _rm as IResourceScheduler;
+
+            var consumer = new TestIKITMod();
+            consumer.callBack = (IResourceManager resMan) =>
+            {
+                Assert.IsTrue(1 == resMan.ConsumeResource(ResourceName.ElectricCharge, 1), "failed to consume electric charge");
+            };
+
+            tvr.moduleList.Add(consumer);
+
+            var empty = new Dictionary<ResourceName, double>();
+            empty.Add(ResourceName.ElectricCharge, 20);
+            var maximums = new Dictionary<ResourceName, double>();
+            maximums.Add(ResourceName.ElectricCharge, 20);
+
+            rm.ExecuteKITModules(1, ref empty, ref maximums);
+            Assert.IsTrue(empty[ResourceName.ElectricCharge] == 19, $"1 seconds should result in 19 EC left");
+            rm.ExecuteKITModules(2, ref empty, ref maximums);
+            Assert.IsTrue(empty[ResourceName.ElectricCharge] == 17, $"2 seconds should result in 17 EC left. Instead got {empty[ResourceName.ElectricCharge]}");
+            rm.ExecuteKITModules(0.2, ref empty, ref maximums);
+            Assert.IsTrue(empty[ResourceName.ElectricCharge] == 16.8, $".2 seconds should result in 16.8 EC left. Instead got {empty[ResourceName.ElectricCharge]}");
+
+        }
     }
 }
