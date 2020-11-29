@@ -119,12 +119,12 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
         /// relatively optimal.
         /// </summary>
         /// <param name="deltaTime">the amount of delta time that each module should use</param>
-        /// <param name="resourcesAvailable">What resources are available for this call.</param>
-        void IResourceScheduler.ExecuteKITModules(double deltaTime, ref Dictionary<ResourceName, double> resourcesAvailable)
+        /// <param name="resourceAmounts">What resources are available for this call.</param>
+        void IResourceScheduler.ExecuteKITModules(double deltaTime, ref Dictionary<ResourceName, double> resourceAmounts, ref Dictionary<ResourceName, double> resourceMaxAmounts)
         {
             int index = 0;
 
-            currentResources = resourcesAvailable;
+            currentResources = resourceAmounts;
             
             tappedOutMods.Clear();
             fixedUpdateCalledMods.Clear();
@@ -162,23 +162,23 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
 
                 modsCurrentlyRunning.Add(mod);
 
-                if (UseThisToHelpWithTesting)
+                try
                 {
                     mod.KITFixedUpdate(this);
                 }
-                else
+                catch (Exception ex)
                 {
-                    try
+                    if (UseThisToHelpWithTesting)
                     {
-                        mod.KITFixedUpdate(this);
+                        throw;
                     }
-                    catch (Exception ex)
+                    else
                     {
                         // XXX - part names and all that.
                         Debug.Log($"[KITResourceManager.ExecuteKITModules] Exception when processing [{mod.KITPartName()}, {(mod as PartModule).ClassName}]: {ex.ToString()}");
                     }
                 }
-
+                
                 if (vesselResources.VesselModified())
                 {
                     index = 0;
@@ -186,6 +186,12 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
                 }
 
                 modsCurrentlyRunning.Remove(mod);
+            }
+
+            if (resourceMaxAmounts.ContainsKey(ResourceName.ElectricCharge) && resourceAmounts.ContainsKey(ResourceName.ElectricCharge))
+            {
+                double fillBattery = resourceMaxAmounts[ResourceName.ElectricCharge] - resourceAmounts[ResourceName.ElectricCharge];
+                resourceAmounts[ResourceName.ElectricCharge] += CallVariableSuppliers(ResourceName.ElectricCharge, fillBattery, 0, fillBattery * fixedDeltaTime);
             }
 
             currentResources = null;
@@ -223,6 +229,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
                 }
                 catch (Exception ex)
                 {
+                    if (UseThisToHelpWithTesting) throw;
                     Debug.Log($"[KITResourceManager.callVariableSuppliers] calling KITMod {KITMod.KITPartName()} resulted in {ex.ToString()}");
                 }
 

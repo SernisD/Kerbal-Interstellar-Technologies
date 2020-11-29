@@ -43,7 +43,7 @@ namespace KerbalInterstellarTechnologies
 
     public interface IResourceScheduler
     {
-        void ExecuteKITModules(double deltaTime, ref Dictionary<ResourceName, double> available);
+        void ExecuteKITModules(double deltaTime, ref Dictionary<ResourceName, double> resourceAmount, ref Dictionary<ResourceName, double> resourceMaxAmount);
     }
 
     public interface IVesselResources
