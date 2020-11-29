@@ -5,17 +5,21 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using KerbalInterstellarTechnologies;
+using KerbalInterstellarTechnologies.Electrical;
+using KerbalInterstellarTechnologies.ResourceManagement;
+using KerbalInterstellarTechnologies.Settings;
 using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Runtime.Serialization;
 
 namespace KIT_Tests.ResourceManager
 {
     [TestClass]
     public class TestVesselResourceManager
     {
-        
-        private KerbalInterstellarTechnologies.ResourceManagement.KITResourceManager Setup()
+        private KITResourceManager Setup()
         {
-            var kitrm = new KerbalInterstellarTechnologies.ResourceManagement.KITResourceManager();
+            var kitrm = new KITResourceManager();
             kitrm.Vessel = new Vessel();
             kitrm.Vessel.vesselName = "Test Vessel";
 
@@ -23,16 +27,48 @@ namespace KIT_Tests.ResourceManager
             return kitrm;
         }
 
-        [TestMethod]
-        public void TestDoesNothingWhenNoModules()
+        private Part RTGPart()
         {
+            var ret = new Part();
+
+            var partmod = new KITPlutoniumRTG();
+            var partmodlist = new PartModuleList(ret);
+            partmodlist.Add(partmod);
+
+            return ret;
+        }
+
+        private Part CallbackPart(int priority, string name, Action<IResourceManager> callback)
+        {
+            var ret = new Part();
+
+            var partmod = new VRMPriorityPartModule(priority, name, callback);
+            var partmodlist = new PartModuleList(ret);
+            partmodlist.Add(partmod);
+
+            return ret;
+        }
+
+        [TestMethod]
+        public void TestSimpleResourceGeneration()
+        {
+            double expected = 0.75, got = 0;
+
             var rm = Setup();
+            rm.Vessel.parts.Add(CallbackPart(5, "TestSimpleResourceGeneration", (IResourceManager resMan) =>
+            {
+                got = resMan.ConsumeResource(ResourceName.ElectricCharge, expected);
+            }));
+
             rm.FixedUpdate();
+
+            Assert.IsTrue(expected == got, $"[TestSimpleResourceGeneration] did not receieve {expected} of EC, got {got}");
         }
 
         [TestMethod]
         public void TestPriorityValues()
         {
+            /*
             var rm = Setup();
             rm.FixedUpdate();
 
@@ -44,6 +80,7 @@ namespace KIT_Tests.ResourceManager
                 Assert.Equals(mods.Length, p.Modules.Count);
                 rm.Vessel.Parts.Add(p);
             }
+            */
         }
 
         [TestMethod]
@@ -80,11 +117,9 @@ namespace KIT_Tests.ResourceManager
             PartName = partName;
         }
 
-        public void KITFixedUpdate(double deltaTime) => CallBack(deltaTime);
-
         public string KITPartName() => PartName;
 
-        public int ResourceProcessPriority() => Priority;
+        public ResourcePriorityValue ResourceProcessPriority() => (ResourcePriorityValue)Priority;
 
         public void KITFixedUpdate(IResourceManager resMan) => CallBack(resMan);
     }

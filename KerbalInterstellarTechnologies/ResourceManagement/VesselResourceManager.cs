@@ -15,19 +15,25 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
     /// </summary>
     public static class VesselEventData
     {
+        private static bool initialized; 
+
         /// <summary>
         /// Initializes the VesselEventData class, and hooks into the GameEvents code.
         /// </summary>
-        static VesselEventData() {
-            GameEvents.onVesselGoOnRails.Add(new EventData<Vessel>.OnEvent(refreshActiveParts));
-            GameEvents.onVesselWasModified.Add(new EventData<Vessel>.OnEvent(refreshActiveParts));
-            GameEvents.onVesselPartCountChanged.Add(new EventData<Vessel>.OnEvent(refreshActiveParts));
-            GameEvents.onVesselGoOffRails.Add(new EventData<Vessel>.OnEvent(refreshActiveParts));
-            GameEvents.onVesselLoaded.Add(new EventData<Vessel>.OnEvent(refreshActiveParts));
-            GameEvents.onPartDestroyed.Add(new EventData<Part>.OnEvent(refreshActiveParts));
-            GameEvents.onPartPriorityChanged.Add(new EventData<Part>.OnEvent(refreshActiveParts));
-            GameEvents.onPartDie.Add(new EventData<Part>.OnEvent(refreshActiveParts));
-            
+        static void initialize()
+        {
+            if (HighLogic.LoadedSceneIsGame)
+            {
+                GameEvents.onVesselGoOnRails.Add(new EventData<Vessel>.OnEvent(refreshActiveParts));
+                GameEvents.onVesselWasModified.Add(new EventData<Vessel>.OnEvent(refreshActiveParts));
+                GameEvents.onVesselPartCountChanged.Add(new EventData<Vessel>.OnEvent(refreshActiveParts));
+                GameEvents.onVesselGoOffRails.Add(new EventData<Vessel>.OnEvent(refreshActiveParts));
+                GameEvents.onVesselLoaded.Add(new EventData<Vessel>.OnEvent(refreshActiveParts));
+                GameEvents.onPartDestroyed.Add(new EventData<Part>.OnEvent(refreshActiveParts));
+                GameEvents.onPartPriorityChanged.Add(new EventData<Part>.OnEvent(refreshActiveParts));
+                GameEvents.onPartDie.Add(new EventData<Part>.OnEvent(refreshActiveParts));
+                initialized = true;
+            }
         }
 
         /// <summary>
@@ -57,7 +63,11 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
         /// Dummy func to ensure the class is initialized.
         /// </summary>
         /// <returns>true</returns>
-        public static bool Ready() => true;
+        public static bool Ready()
+        {
+            if(initialized == false) initialize();
+            return initialized;
+        }
     }
 
     /// <summary>
@@ -68,10 +78,8 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
     /// 
     /// <para>It also manages what resources are available each FixedUpdate() tick for the modules, and once all modules have ran, it finalizes the reults. This eliminates the need for resource buffering implementations.</para>
     /// </summary>
-    public class KITResourceManager : VesselModule, IResourceManager
+    public class KITResourceManager : VesselModule, IVesselResources
     {
-        public static int SupplierOnlyFlag = 0x80;
-
         public bool refreshEventOccurred;
 
         private bool hasKITModules;
@@ -81,8 +89,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
         [KSPField] bool catchUpNeeded;
 
         private double fixedDeltaTime;
-        public ICheatOptions myCheatOptions = RealCheatOptions.Instance;
-
+       
         private bool needsRefresh
         {
             get { return !initialized || catchUpNeeded || refreshEventOccurred; }
@@ -93,20 +100,20 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
         {
             base.OnAwake();
 
-            VesselEventData.Ready(); // ensure the static class gets initialized
-            refreshActiveModules();
+            ResourceManager resourceManager = new ResourceManager(this, RealCheatOptions.Instance);
         }
 
-        private SortedDictionary<int, List<IKITMod>> sortedModules = new SortedDictionary<int, List<IKITMod>>();
-        private List<IKITMod> activeKITModules = new List<IKITMod>(128);
+        private SortedDictionary<ResourceName, SortedDictionary<ResourcePriorityValue, List<IKITVariableSupplier>>> variableSupplierModules = new SortedDictionary<ResourceName, SortedDictionary<ResourcePriorityValue, List<IKITVariableSupplier>>>();
 
         /// <summary>
         /// refreshActiveModules() .. refreshes the list of active IKITMod modules. (pretty surprising).
         /// </summary>
-        private void refreshActiveModules()
+        private void RefreshActiveModules()
         {
+            /*
             sortedModules.Clear();
             activeKITModules.Clear();
+            variableSupplierModules.Clear();
 
             if (vessel == null || vessel.parts == null) return;
             Debug.Log($"[{this.GetType().Name} and {vessel.vesselName}] refreshParts - refreshing!");
@@ -116,9 +123,11 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
             var kitlist = vessel.FindPartModulesImplementing<IKITMod>();
             foreach (var mod in kitlist)
             {
+                // Handle the KITFixedUpdate() side of things first.
+
                 var priority = mod.ResourceProcessPriority();
-                var prepend = (priority & SupplierOnlyFlag) == SupplierOnlyFlag;
-                priority &= ~SupplierOnlyFlag;
+                var prepend = (priority & ResourcePriorityValue.SupplierOnlyFlag) == ResourcePriorityValue.SupplierOnlyFlag;
+                priority &= ~ResourcePriorityValue.SupplierOnlyFlag;
 
                 if (sortedModules.TryGetValue(priority, out KITMods) == false)
                 {
@@ -132,6 +141,34 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
                 else
                 {
                     sortedModules[priority].Append(mod);
+                }
+
+                // Now handle the variable consumption side of things
+
+                var supmod = mod as IKITVariableSupplier;
+                if (supmod == null) continue;
+
+                foreach (ResourceName resource in supmod.ResourcesProvided())
+                {
+                    if (variableSupplierModules.ContainsKey(resource) == false)
+                    {
+                        variableSupplierModules[resource] = new SortedDictionary<ResourcePriorityValue, List<IKITVariableSupplier>>();
+                    }
+                    var modules = variableSupplierModules[resource];
+                    if (modules.ContainsKey(priority) == false)
+                    {
+                        modules[priority] = new List<IKITVariableSupplier>(16);
+                    }
+
+                    if (prepend)
+                    {
+                        modules[priority].Prepend(supmod);
+                    }
+                    else
+                    {
+                        modules[priority].Append(supmod);
+                    }
+
                 }
             }
 
@@ -149,52 +186,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
             {
                 activeKITModules.AddRange(list);
             }
-        }
-
-        List<IKITMod> visited = new List<IKITMod>(128);
-
-        private bool inExecuteKITModules;
-
-        /// <summary>
-        /// ExecuteKITModules() does the heavy work of executing all the IKITMod FixedUpdate() equiv. It needs to be careful to ensure
-        /// it is using the most recent list of modules, hence the odd looping code. In the case of no part updates are needed, it's
-        /// relatively optimal.
-        /// </summary>
-        /// <param name="deltaTime">the amount of delta time that each module should use</param>
-        private void ExecuteKITModules(double deltaTime)
-        {
-            bool checkVisited = false;
-            int index = 0;
-
-            fixedDeltaTime = deltaTime;
-            visited.Clear();
-
-            while (index != activeKITModules.Count)
-            {
-                var mod = activeKITModules[index];
-                index++;
-
-                if (checkVisited) if (visited.Contains(mod)) continue;
-                visited.Add(mod);
-
-                try
-                {
-                    mod.KITFixedUpdate(this);
-                }
-                catch (Exception ex)
-                {
-                    // XXX - part names and all that.
-                    Debug.Log($"[KITResourceManager.ExecuteKITModules] Exception when processing [{mod.KITPartName()}, {(mod as PartModule).ClassName}]: {ex.ToString()}");
-                }
-
-                if (needsRefresh)
-                {
-                    index = 0;
-                    checkVisited = true;
-                    refreshActiveModules();
-                }
-            }
-            
+            */
         }
 
         /// <summary>
@@ -202,19 +194,23 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
         /// </summary>
         public void FixedUpdate()
         {
+            /*
             if (!vessel.loaded)
             {
                 catchUpNeeded = true;
                 return;
             }
-            
+
             if (!HighLogic.LoadedSceneIsFlight || vessel.vesselType == VesselType.SpaceObject ||
                 vessel.isEVA || vessel.vesselType == VesselType.Debris) return;
-            
+
+            // if (lastExecuted == 0) catchUpNeeded = false;
             var deltaTime = lastExecuted - Planetarium.GetUniversalTime();
             lastExecuted = Planetarium.GetUniversalTime();
 
-            if (needsRefresh) refreshActiveModules();
+            GatherResources();
+
+            if (needsRefresh) RefreshActiveModules();
             if (hasKITModules == false) return;
 
             inExecuteKITModules = true;
@@ -230,79 +226,99 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
 
             ExecuteKITModules(TimeWarp.fixedDeltaTime);
 
-            // And once all that is done, check how much EC is missing from the vessel, and generate it.
+            DisperseResources();
 
             inExecuteKITModules = false;
+            */
         }
 
-        /// <summary>
-        /// Called by the IKITMod to consume resources present on a vessel. It automatically converts the wanted amount by the appropriate value to
-        /// give you a per-second resource consumption.
-        /// </summary>
-        /// <param name="name">Name of the resource</param>
-        /// <param name="wanted">How much you want</param>
-        /// <returns>How much you got</returns>
-        double IResourceManager.ConsumeResource(string name, double wanted)
+        bool IVesselResources.VesselModified()
         {
-            if (!inExecuteKITModules)
-            {
-                Debug.Log("[KITResourceManager.ConsumeResource] don't do this.");
-                return 0;
-            }
-            if (name == ResourceSettings.ElectricCharge && myCheatOptions.InfiniteElectricity) return wanted;
             throw new NotImplementedException();
         }
 
-        /// <summary>
-        /// Called by the IKITMod to produce resources on a vessel.It automatically converts the amount by the appropriate value to
-        /// give a per-second resource production.
-        /// </summary>
-        /// <param name="name">Name of the resource</param>
-        /// <param name="amount">Amount you are providing</param>
-        void IResourceManager.ProduceResource(string name, double amount)
+        void IVesselResources.VesselKITModules(ref List<IKITMod> moduleList, ref Dictionary<ResourceName, List<IKITVariableSupplier>> variableSupplierModules)
         {
-            if (!inExecuteKITModules)
-            {
-                Debug.Log("[KITResourceManager.ProduceResource] don't do this.");
-                return;
-            }
-
-            if (name == ResourceSettings.WasteHeat && myCheatOptions.IgnoreMaxTemperature) return;
             throw new NotImplementedException();
         }
 
-        // don't use global variable
-        double IResourceManager.FixedDeltaTime() => fixedDeltaTime;
-
-        // Instead of accessing a global variable
-        ICheatOptions IResourceManager.CheatOptions() => myCheatOptions;
-
-        class ResourceDummy : PartModule, IKITMod
+        void GatherResources(ref Dictionary<ResourceName, double> available)
         {
-            [KSPField(guiActive = true, guiActiveEditor = true, guiName = "power priority level", isPersistant = true), UI_FloatRange(minValue = 1, maxValue = 5, stepIncrement = 1)]
-            public float resourcePriority = 1;
-
-            [KSPField(guiActive = true, guiActiveEditor = false, guiName = "Destroy"), UI_Toggle(disabledText = "Off", enabledText = "On", affectSymCounterparts = UI_Scene.All)] public bool destroyInUpdate = false;
-
-            int explosionCountdown = 5;
-
-            public void KITFixedUpdate(double deltaTime)
+            foreach (var part in vessel.Parts)
             {
-                if (destroyInUpdate)
+                foreach (var resource in part.Resources)
                 {
-                    Debug.Log("$[KITResourceUpdate] ready set go!");
-                    if (explosionCountdown-- == 0) { part.explode(); }
+                    if (resource.maxAmount == 0) continue;
+
+                    var resourceID = ResourceSettings.NameToResource(resource.resourceName);
+                    if (resourceID == ResourceName.Unknown)
+                    {
+                        Debug.Log($"[KITResourceManager.GatherResources] ignoring unknown resource {resource.resourceName}");
+                        continue;
+                    }
+
+                    if (available.ContainsKey(resourceID) == false)
+                    {
+                        available[resourceID] = available[resourceID] = 0;
+                    }
+
+                    available[resourceID] += resource.amount;
                 }
             }
+        }
 
-            public int ResourceProcessPriority() => ((int)resourcePriority & 1) == 1 ? (int)resourcePriority : KITResourceManager.SupplierOnlyFlag | (int)resourcePriority;
-
-            public string KITPartName() => "Resource Dummy";
-
-            public void KITFixedUpdate(IResourceManager resMan)
+        void DisperseResources(ref Dictionary<ResourceName, double> available)
+        {
+            foreach (var part in vessel.Parts)
             {
-                throw new NotImplementedException();
+                foreach (var resource in part.Resources)
+                {
+                    var resourceID = ResourceSettings.NameToResource(resource.resourceName);
+                    if (resourceID == ResourceName.Unknown)
+                    {
+                        Debug.Log($"[KITResourceManager.DisperseResources] ignoring unknown resource {resource.resourceName}");
+                        continue;
+                    }
+
+                    if (available.ContainsKey(resourceID) == false) return; // Shouldn't happen
+                    if (available[resourceID] == 0) return;
+
+                    var tmp = Math.Min(available[resourceID], resource.maxAmount - resource.amount);
+                    available[resourceID] -= tmp;
+                    resource.amount = tmp;
+                }
             }
         }
     }
+
+    class ResourceDummy : PartModule, IKITMod
+    {
+        [KSPField(guiActive = true, guiActiveEditor = true, guiName = "power priority level", isPersistant = true), UI_FloatRange(minValue = 1, maxValue = 5, stepIncrement = 1)]
+       public float resourcePriority = 1;
+
+        [KSPField(guiActive = true, guiActiveEditor = false, guiName = "Destroy"), UI_Toggle(disabledText = "Off", enabledText = "On", affectSymCounterparts = UI_Scene.All)] public bool destroyInUpdate = false;
+
+        [KSPField(guiActive = true, guiActiveEditor = false, guiName = "Supplier Only"), UI_Toggle(disabledText = "Off", enabledText = "On", affectSymCounterparts = UI_Scene.All)] public bool SupplierOnly = false;
+
+        int explosionCountdown = 5;
+
+        public void KITFixedUpdate(double deltaTime)
+        {
+            if (destroyInUpdate)
+            {
+                Debug.Log("$[KITResourceUpdate] ready set go!");
+                if (explosionCountdown-- == 0) { part.explode(); }
+            }
+        }
+
+        public ResourcePriorityValue ResourceProcessPriority() => (ResourcePriorityValue)(resourcePriority) | ResourcePriorityValue.SupplierOnlyFlag;
+
+        public string KITPartName() => "Resource Dummy";
+
+        public void KITFixedUpdate(IResourceManager resMan)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }
+

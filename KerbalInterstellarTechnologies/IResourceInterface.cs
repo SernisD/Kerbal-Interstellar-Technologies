@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using KerbalInterstellarTechnologies.Settings;
+using System.Collections.Generic;
 
 namespace KerbalInterstellarTechnologies
 {
@@ -16,7 +17,7 @@ namespace KerbalInterstellarTechnologies
         /// <param name="name">Resource Name</param>
         /// <param name="wanted">Requested amount of resource to consume per second</param>
         /// <returns>Amount of resource that there is to consume (per second)</returns>
-        double ConsumeResource(string name, double wanted);
+        double ConsumeResource(ResourceName resource, double wanted);
 
         /// <summary>
         /// Adds resources to the resource pool. It automatically converts your request to per-seconds,
@@ -24,7 +25,7 @@ namespace KerbalInterstellarTechnologies
         /// </summary>
         /// <param name="name">Resource Name</param>
         /// <param name="amount">Amount of resource to produce per second</param>
-        void ProduceResource(string name, double amount);
+        void ProduceResource(ResourceName resource, double amount);
 
         /// <summary>Provides access to the (equivilient) of TimeWarp.fixedDeltaTime.</summary>
         /// <remarks>
@@ -40,6 +41,18 @@ namespace KerbalInterstellarTechnologies
         ICheatOptions CheatOptions();
     }
 
+    public interface IResourceScheduler
+    {
+        void ExecuteKITModules(double deltaTime, ref Dictionary<ResourceName, double> available);
+    }
+
+    public interface IVesselResources
+    {
+        // since the last call.
+        bool VesselModified();
+        void VesselKITModules(ref List<IKITMod> moduleList, ref Dictionary<ResourceName, List<IKITVariableSupplier>> variableSupplierModules);
+    }
+
     /// <summary>
     /// IKITMod defines an interface used by Kerbal Interstellar Technologies PartModules. Through this interface,
     /// various functions are called on the PartModule from the KIT Resource Manager Vessel Module.
@@ -50,7 +63,7 @@ namespace KerbalInterstellarTechnologies
         /// This is the priority that the module should run at, from 1 to 5. 1 will be ran first, and 5 will be ran last.
         /// </summary>
         /// <returns>Part Priority</returns>
-        int ResourceProcessPriority();
+        ResourcePriorityValue ResourceProcessPriority();
         /// <summary>
         /// KITFixedUpdate replaces the FixedUpdate function for Kerbal Interstellar Technologies PartModules. 
         /// </summary>
@@ -64,7 +77,7 @@ namespace KerbalInterstellarTechnologies
     }
 
     /// <summary>
-    /// Marks a IKITMod that can be called as needed to produce resources for the vessel.
+    /// Marks a PartModule that can be called as needed to produce resources for the vessel.
     /// </summary>
     public interface IKITVariableSupplier
     {
@@ -72,7 +85,7 @@ namespace KerbalInterstellarTechnologies
         /// What resources can this module provide on demand?
         /// </summary>
         /// <returns>Returns a list of strings for the resources it can provide</returns>
-        string[] ResourcesProvided();
+        ResourceName[] ResourcesProvided();
 
         /// <summary>
         /// Checks to see if the requested resource can be provided.
@@ -80,7 +93,7 @@ namespace KerbalInterstellarTechnologies
         /// <param name="name"></param>
         /// <param name="requestedAmount"></param>
         /// <returns></returns>
-        double ProvideResource(string name, double requestedAmount);
+        bool ProvideResource(IResourceManager resMan, ResourceName resource, double requestedAmount);
     }
 
     

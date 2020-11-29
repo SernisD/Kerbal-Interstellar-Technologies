@@ -5,6 +5,7 @@ using System.Diagnostics;
 
 namespace KIT_Tests.FuelStorage
 {
+    /*
     [TestClass]
     public class TestKITCryostat
     {
@@ -129,12 +130,8 @@ namespace KIT_Tests.FuelStorage
                 // Debug.WriteLine($"{x.Key}: {x.Value}");
                 Assert.IsTrue(false, "Key: {x.Key} Value: {x.Value}");
             });
-            */
-        }
 
-        [TestMethod]
-        public void TestBoilOffProcess()
-        {
         }
-    }
+            */
+
 }

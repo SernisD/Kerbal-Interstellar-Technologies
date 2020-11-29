@@ -1,18 +1,106 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using UnityEngine;
+// ng System.ComponentModel;
 
 namespace KerbalInterstellarTechnologies.Settings
 {
+    /// <summary>
+    /// If you change this, then you'll also need to change the following areas of code at a minimum:
+    ///   - ResourceSettings.ResourceToName
+    ///   - ResourceSettings.ValidateResource
+    /// </summary>
+    public enum ResourceName
+    {
+        Unknown,                
+        ElectricCharge,
+        LiquidFuel,
+        Oxidizer,
+        MonoPropellant,
+
+        WasteHeat,
+
+        EndResource,
+    }
+
+    public enum ResourcePriorityValue
+    {
+        First = 1,
+        Second = 2,
+        Third = 3,
+        Fourth = 4,
+        Fifth = 5,
+        SupplierOnlyFlag = 0x80,
+    }
+
+
+
     public static class ResourceSettings
     {
+        public static string Unknown { get; private set; } = "Unknown";
+        public static string EndResource { get; private set; } = "EndResource";
+
         #region Builtin resources
-        public readonly static string ElectricCharge = "ElectricCharge";
-        public static string WasteHeat { get; private set; } = "WasteHeat";
-        
+        public static string ElectricCharge { get; private set; } = "ElectricCharge";
+        public static string LiquidFuel { get; private set; } = "LiquidFuel";
+        public static string Oxidizer { get; private set; } = "Oxidizer";
+        public static string MonoPropellant { get; private set; } = "MonoPropellant";
         #endregion
+
+        #region KIT Basic Resources
+        public static string WasteHeat { get; private set; } = "WasteHeat";
+        #endregion
+
+
+        public static string ResourceToName(ResourceName resource)
+        {
+            switch(resource)
+            {
+                case ResourceName.Unknown: return ElectricCharge;
+                case ResourceName.ElectricCharge: return ElectricCharge;
+                case ResourceName.LiquidFuel: return LiquidFuel;
+                case ResourceName.Oxidizer: return Oxidizer;
+                case ResourceName.MonoPropellant: return MonoPropellant;
+                case ResourceName.WasteHeat: return WasteHeat;
+                case ResourceName.EndResource: return EndResource;
+                default: throw new InvalidEnumArgumentException(nameof(resource), (int)resource, typeof(ResourceName));
+            }
+        }
+
+        private static Dictionary<string, ResourceName> nameToResourceMap;
+
+        public static ResourceName NameToResource(string name)
+        {
+            if (nameToResourceMap == null) {
+                nameToResourceMap = new Dictionary<string, ResourceName>(64);
+
+                for (var i = 0; i < (int)ResourceName.EndResource; i++) {
+                    nameToResourceMap[ResourceToName((ResourceName)i)] = (ResourceName)i;
+                }
+            }
+
+            if(nameToResourceMap.ContainsKey(name) == false)
+            {
+                Debug.Log($"[ResourceSettings.ResourceName] requested to map unknown resource {name} - this will likely blow up");
+                return ResourceName.Unknown;
+            }
+
+            return nameToResourceMap[name];
+        }
+
+        /// <summary>
+        /// Blows up if the supplied resource value does not map to the enum structure above.
+        /// </summary>
+        /// <param name="resource"></param>
+        public static void ValidateResource(ResourceName resource)
+        {
+            if(resource <= ResourceName.Unknown || resource >= ResourceName.EndResource) 
+                throw new InvalidEnumArgumentException(nameof(resource), (int)resource, typeof(ResourceName));
+        }
 
         /*
 
