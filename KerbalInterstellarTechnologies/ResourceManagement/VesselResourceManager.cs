@@ -129,6 +129,8 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
             if (!HighLogic.LoadedSceneIsFlight || vessel.vesselType == VesselType.SpaceObject ||
                 vessel.isEVA || vessel.vesselType == VesselType.Debris) return;
 
+            VesselWideResourceBuffering();
+
             if (lastExecuted == 0) catchUpNeeded = false;
             double currentTime = Planetarium.GetUniversalTime();
             var deltaTime = lastExecuted - currentTime;
@@ -294,7 +296,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
                     if (available.ContainsKey(resourceID) == false) return; // Shouldn't happen
                     if (available[resourceID] == 0) return;
 
-                    var tmp = Math.Min(available[resourceID], resource.maxAmount - resource.amount);
+                    var tmp = Math.Min(available[resourceID], resource.maxAmount);
                     available[resourceID] -= tmp;
                     resource.amount = tmp;
                 }
@@ -303,8 +305,91 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
 
         public void OnKITProcessingFinished(IResourceManager resourceManager)
         {
-            // 
+            PerformResourceDecay(resourceManager);
         }
+
+        #region Vessel Wide Decay
+        /*
+         * Implement decay for across the vessel
+         */
+
+        
+        private bool decayDisabled = false;
+        private static Dictionary<string, double> decayConfiguration = new Dictionary<string, double>();
+
+        public static List<string> PerformResourceDecayEffect(IResourceManager resourceManager, List<PartResource[]> partResources, Dictionary<String, DecayConfiguration> decayConfiguration)
+        {
+            List<string> badResources = new List<string>(8);
+
+            DecayConfiguration config;
+            double fixedDeltaTime = resourceManager.FixedDeltaTime();
+
+            foreach(var list in partResources)
+            {
+                foreach(var resource in list)
+                {
+                    if (resource.amount == 0) continue;
+                    if (decayConfiguration.TryGetValue(resource.resourceName, out config) == false)
+                    {
+                        badResources.Add(resource.resourceName);
+                        continue;
+                    }
+
+                    // Account for decay over time for the resource amount.
+                    double n_0 = resource.amount;
+                    resource.amount = n_0 * Math.Exp(-config.decayConstant * fixedDeltaTime);
+                    double n_diff = n_0 - resource.amount;
+
+                    // As this uses the ProduceResource API, we get time handling done for free.
+                    var decayAmount = Math.Exp(-config.decayConstant);
+                    var n_change = n_0 - (n_0 * decayAmount);
+
+                    resourceManager.ProduceResource(config.decayProduct, n_change * config.densityRatio);
+                }
+            }
+
+            return badResources;
+        }
+
+        private void ConfigureResourceDecay()
+        { 
+            ConfigNode[] decayConfigs;
+            ConfigNode decayConfigRoot;
+
+            decayConfigs = GameDatabase.Instance.GetConfigNodes("KIT_DECAY_CONFIG");
+            if (decayConfigs == null)
+            {
+                Debug.Log("[VesselResourceManager.ConfigureResourceDecay] Unable to find decay configuration");
+                decayDisabled = true;
+                return;
+            }
+
+            decayConfigRoot = decayConfigs[0];
+        }
+
+        private void PerformResourceDecay(IResourceManager resourceManager)
+        {
+            if (decayDisabled || resourceManager.CheatOptions().UnbreakableJoints) return;
+
+            if(decayConfiguration.Count == 0) ConfigureResourceDecay();
+            
+            List<PartResource[]> partResources = new List<PartResource[]>();
+            foreach (var part in vessel.parts)
+            {
+                partResources.Add(part.Resources.ToArray());
+            }
+
+            var dc = new Dictionary<string, DecayConfiguration>();
+            PerformResourceDecayEffect(resourceManager, partResources, dc);
+        }
+        #endregion
+
+        #region Vessel Wide Resource Buffering
+        private void VesselWideResourceBuffering()
+        {
+
+        }
+        #endregion
     }
 
     class ResourceDummy : PartModule, IKITMod

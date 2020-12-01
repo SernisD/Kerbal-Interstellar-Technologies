@@ -63,6 +63,9 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
             currentResources[resource] -= tmp;
             if (obtainedAmount >= modifiedAmount) return wanted;
 
+            // XXX - todo. At this stage, we might want to try requesting more than we need to refill the resources on hand.
+            // Some % of total capacity or something like that? Might reduce some future calls
+
             // Convert to seconds
             obtainedAmount = wanted * (obtainedAmount / modifiedAmount);
             obtainedAmount = CallVariableSuppliers(resource, obtainedAmount, wanted); 
@@ -253,6 +256,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
             return obtainedAmount;
         }
         #endregion
+
         #region Electric Charge buffering
         /*
          * Players can run into resource buffering issues with external parts easily enough. We should handle resource buffering for the vessel
@@ -261,15 +265,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
 
         #endregion
 
-        #region Vessel Wide Decay
-        /*
-         * Implement decay for across the vessel
-         */
-        private void PerformResourceDecay()
-        {
 
-        }
-        #endregion
     }
 }
 
