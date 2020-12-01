@@ -51,6 +51,7 @@ namespace KerbalInterstellarTechnologies
         // since the last call.
         bool VesselModified();
         void VesselKITModules(ref List<IKITMod> moduleList, ref Dictionary<ResourceName, List<IKITVariableSupplier>> variableSupplierModules);
+        void OnKITProcessingFinished(IResourceManager resourceManager);
     }
 
     /// <summary>

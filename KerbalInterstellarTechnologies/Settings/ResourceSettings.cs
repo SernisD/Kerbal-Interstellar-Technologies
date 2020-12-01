@@ -99,7 +99,7 @@ namespace KerbalInterstellarTechnologies.Settings
         public static void ValidateResource(ResourceName resource)
         {
             if(resource <= ResourceName.Unknown || resource >= ResourceName.EndResource) 
-                throw new InvalidEnumArgumentException(nameof(resource), (int)resource, typeof(ResourceName));
+                throw new InvalidEnumArgumentException(nameof(resource), (int)resource, typeof(ResourceName));  
         }
 
         /*

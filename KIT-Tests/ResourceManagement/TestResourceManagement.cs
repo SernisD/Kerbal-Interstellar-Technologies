@@ -14,9 +14,15 @@ namespace KIT_Tests.ResourceManagement
     public class TestVesselResources : IVesselResources
     {
         public bool vesselModifiedCalled;
+        public bool OnKITProcessingFinishedCalled;
         public bool vesselModified;
         public List<IKITMod> moduleList = new List<IKITMod>();
         public Dictionary<ResourceName, List<IKITVariableSupplier>> variableSupplierModules = new Dictionary<ResourceName, List<IKITVariableSupplier>>();
+
+        void IVesselResources.OnKITProcessingFinished(IResourceManager resourceManager)
+        {
+            OnKITProcessingFinishedCalled = true;
+        }
 
         void IVesselResources.VesselKITModules(ref List<IKITMod> updatedModuleList, ref Dictionary<ResourceName, List<IKITVariableSupplier>> updatedVariableSupplierModules)
         {
@@ -75,21 +81,63 @@ namespace KIT_Tests.ResourceManagement
     public class TestResourceManagement
     {
         [TestMethod]
-        public void TestVesselModificationandPlutoniumRTG()
+        public void TestVesselFinishedCallback()
         {
             var tvr = new TestVesselResources();
             tvr.vesselModified = true;
 
+            bool allGood = false;
+
+            var _rm = new KerbalInterstellarTechnologies.ResourceManagement.ResourceManager(tvr, RealCheatOptions.Instance);
+            _rm.UseThisToHelpWithTesting = true;
+            var rm = _rm as IResourceScheduler;
+
+            var resources = new Dictionary<ResourceName, double>();
+            var maxims = new Dictionary<ResourceName, double>();
+            rm.ExecuteKITModules(1, ref resources, ref maxims);
+
+            // This code should never get called, as there was no processing performed
+            Assert.IsFalse(tvr.OnKITProcessingFinishedCalled, "called OnKITProcessingFinishedCalled when unexpected");
+
+            var consumer = new TestIKITMod();
+            consumer.callBack = (IResourceManager resMan) =>
+            {
+                allGood = true;
+            };
+
+            tvr.moduleList.Add(consumer);
+
+            rm.ExecuteKITModules(1, ref resources, ref maxims);
+
+            Assert.IsTrue(allGood, "failed to execute IKITMod");
+            Assert.IsTrue(tvr.OnKITProcessingFinishedCalled, "did not call OnKITProcessingFinishedCalled");
+        }
+
+        [TestMethod]
+        public void TestVesselModificationandRTG()
+        {
+            var tvr = new TestVesselResources();
+            tvr.vesselModified = true;
+            
             var resources = new Dictionary<ResourceName, double>();
             var maximums = new Dictionary<ResourceName, double>();
             maximums.Add(ResourceName.ElectricCharge, 5);
 
-            var rm = new KerbalInterstellarTechnologies.ResourceManagement.ResourceManager(tvr, RealCheatOptions.Instance) as IResourceScheduler;
+            var _rm = new KerbalInterstellarTechnologies.ResourceManagement.ResourceManager(tvr, RealCheatOptions.Instance);
+            _rm.UseThisToHelpWithTesting = true;
+            var rm = _rm as IResourceScheduler;
+
             rm.ExecuteKITModules(1, ref resources, ref maximums);
 
             Assert.IsTrue(true == tvr.vesselModifiedCalled, "Did not perform IVesselResources.VesselModified() callback");
 
-            tvr.moduleList.Add(new KITPlutoniumRTG());
+            var producer = new TestIKITMod();
+            producer.callBack = (IResourceManager resMan) =>
+            {
+                resMan.ProduceResource(ResourceName.ElectricCharge, 0.75);
+            };
+
+            tvr.moduleList.Add(producer);
 
             rm.ExecuteKITModules(1, ref resources, ref maximums);
 

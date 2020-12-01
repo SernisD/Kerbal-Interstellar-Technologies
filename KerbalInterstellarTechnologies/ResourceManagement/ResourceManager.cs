@@ -27,8 +27,9 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
             this.vesselResources = vesselResources;
             this.myCheatOptions = cheatOptions;
         }
+       
+        #region IResourceManager implementation
         ICheatOptions IResourceManager.CheatOptions() => myCheatOptions;
-
         private bool inExecuteKITModules;
 
         /// <summary>
@@ -107,6 +108,9 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
             }
             currentResources[resource] += amount * fixedDeltaTime;
         }
+
+        #endregion
+        #region IResourceScheduler implementation
 
         // private SortedDictionary<ResourcePriorityValue, List<IKITMod>> sortedModules = new SortedDictionary<ResourcePriorityValue, List<IKITMod>>();
         private List<IKITMod> activeKITModules = new List<IKITMod>(128);
@@ -187,11 +191,16 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
                 modsCurrentlyRunning.Remove(mod);
             }
 
+            // Check to see if the variable suppliers can be used to fill any missing EC from the vessel. This will charge
+            // any batteries present on the ship.
             if (resourceMaxAmounts.ContainsKey(ResourceName.ElectricCharge) && resourceAmounts.ContainsKey(ResourceName.ElectricCharge))
             {
                 double fillBattery = resourceMaxAmounts[ResourceName.ElectricCharge] - resourceAmounts[ResourceName.ElectricCharge];
-                resourceAmounts[ResourceName.ElectricCharge] += CallVariableSuppliers(ResourceName.ElectricCharge, 0, fillBattery);
+                if(fillBattery > 0) 
+                    resourceAmounts[ResourceName.ElectricCharge] += CallVariableSuppliers(ResourceName.ElectricCharge, 0, fillBattery);
             }
+
+            vesselResources.OnKITProcessingFinished(this);
 
             currentResources = null;
             inExecuteKITModules = false;
@@ -243,6 +252,24 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
 
             return obtainedAmount;
         }
+        #endregion
+        #region Electric Charge buffering
+        /*
+         * Players can run into resource buffering issues with external parts easily enough. We should handle resource buffering for the vessel
+         * for them.
+         */
+
+        #endregion
+
+        #region Vessel Wide Decay
+        /*
+         * Implement decay for across the vessel
+         */
+        private void PerformResourceDecay()
+        {
+
+        }
+        #endregion
     }
 }
 

@@ -22,7 +22,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
         /// </summary>
         static void initialize()
         {
-            if (HighLogic.LoadedSceneIsGame)
+            if (!initialized && HighLogic.LoadedSceneIsGame | HighLogic.LoadedSceneIsFlight)
             {
                 GameEvents.onVesselGoOnRails.Add(new EventData<Vessel>.OnEvent(refreshActiveParts));
                 GameEvents.onVesselWasModified.Add(new EventData<Vessel>.OnEvent(refreshActiveParts));
@@ -32,6 +32,8 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
                 GameEvents.onPartDestroyed.Add(new EventData<Part>.OnEvent(refreshActiveParts));
                 GameEvents.onPartPriorityChanged.Add(new EventData<Part>.OnEvent(refreshActiveParts));
                 GameEvents.onPartDie.Add(new EventData<Part>.OnEvent(refreshActiveParts));
+                GameEvents.onPartDeCouple.Add(new EventData<Part>.OnEvent(refreshActiveParts));
+                // GameEvents.
                 initialized = true;
             }
         }
@@ -43,7 +45,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
         private static void refreshActiveParts(Part data)
         {
             if (data == null || data.vessel == null) return;
-            var resourceMod = data.vessel.FindVesselModuleImplementing<KITResourceManager>();
+            var resourceMod = data.vessel.FindVesselModuleImplementing<KITResourceVesselModule>();
             if (resourceMod == null) return;
             resourceMod.refreshEventOccurred = true;
         }
@@ -54,7 +56,7 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
         private static void refreshActiveParts(Vessel data)
         {
             if (data == null) return;
-            var resourceMod = data.FindVesselModuleImplementing<KITResourceManager>();
+            var resourceMod = data.FindVesselModuleImplementing<KITResourceVesselModule>();
             if (resourceMod == null) return;
             resourceMod.refreshEventOccurred = true;
         }
@@ -78,47 +80,98 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
     /// 
     /// <para>It also manages what resources are available each FixedUpdate() tick for the modules, and once all modules have ran, it finalizes the reults. This eliminates the need for resource buffering implementations.</para>
     /// </summary>
-    public class KITResourceManager : VesselModule, IVesselResources
+    public class KITResourceVesselModule : VesselModule, IVesselResources
     {
-        public bool refreshEventOccurred;
-
-        private bool hasKITModules;
-        private bool initialized;
+        public bool refreshEventOccurred = true;
 
         [KSPField] double lastExecuted;
         [KSPField] bool catchUpNeeded;
 
         private double fixedDeltaTime;
-       
+
+        ResourceManager resourceManager;
+        IResourceScheduler resourceScheduler;
+
         private bool needsRefresh
         {
-            get { return !initialized || catchUpNeeded || refreshEventOccurred; }
-            set { initialized = true; refreshEventOccurred = value; }
+            get { return catchUpNeeded || refreshEventOccurred; }
+            set { refreshEventOccurred = value; }
         }
 
         protected override void OnAwake()
         {
             base.OnAwake();
 
-            ResourceManager resourceManager = new ResourceManager(this, RealCheatOptions.Instance);
+            if (resourceManager == null)
+            {
+                resourceManager = new ResourceManager(this, RealCheatOptions.Instance);
+                resourceScheduler = resourceManager;
+            }
+
         }
 
         private SortedDictionary<ResourceName, SortedDictionary<ResourcePriorityValue, List<IKITVariableSupplier>>> variableSupplierModules = new SortedDictionary<ResourceName, SortedDictionary<ResourcePriorityValue, List<IKITVariableSupplier>>>();
 
+        Dictionary<ResourceName, double> resourceAmounts = new Dictionary<ResourceName, double>(32);
+        Dictionary<ResourceName, double> resourceMaxAmounts = new Dictionary<ResourceName, double>(32);
+
         /// <summary>
-        /// refreshActiveModules() .. refreshes the list of active IKITMod modules. (pretty surprising).
+        /// FixedUpdate() triggers the ExecuteKITModules() function call above. It implements automatic catch up processing for each module.
         /// </summary>
-        private void RefreshActiveModules()
+        public void FixedUpdate()
         {
-            /*
-            sortedModules.Clear();
-            activeKITModules.Clear();
+            if (!vessel.loaded)
+            {
+                catchUpNeeded = true;
+                return;
+            }
+
+            if (!HighLogic.LoadedSceneIsFlight || vessel.vesselType == VesselType.SpaceObject ||
+                vessel.isEVA || vessel.vesselType == VesselType.Debris) return;
+
+            if (lastExecuted == 0) catchUpNeeded = false;
+            double currentTime = Planetarium.GetUniversalTime();
+            var deltaTime = lastExecuted - currentTime;
+            lastExecuted = currentTime;
+
+            GatherResources(ref resourceAmounts, ref resourceMaxAmounts);
+
+            if (catchUpNeeded)
+            {
+                resourceScheduler.ExecuteKITModules(deltaTime, ref resourceAmounts, ref resourceMaxAmounts);
+                catchUpNeeded = false;
+            }
+
+            resourceScheduler.ExecuteKITModules(TimeWarp.fixedDeltaTime, ref resourceAmounts, ref resourceMaxAmounts);
+            DisperseResources(ref resourceAmounts);
+        }
+
+        bool IVesselResources.VesselModified()
+        {
+            bool ret = catchUpNeeded | refreshEventOccurred;
+            refreshEventOccurred = false;
+
+            return ret;
+        }
+
+        SortedDictionary<ResourcePriorityValue, List<IKITMod>> sortedModules = new SortedDictionary<ResourcePriorityValue, List<IKITMod>>();
+        Dictionary<ResourceName, SortedDictionary<ResourcePriorityValue, List<IKITVariableSupplier>>> tmpVariableSupplierModules = new Dictionary<ResourceName, SortedDictionary<ResourcePriorityValue, List<IKITVariableSupplier>>>();
+
+        void IVesselResources.VesselKITModules(ref List<IKITMod> moduleList, ref Dictionary<ResourceName, List<IKITVariableSupplier>> variableSupplierModules)
+        {
+            // Clear the inputs
+
+            moduleList.Clear();
             variableSupplierModules.Clear();
 
-            if (vessel == null || vessel.parts == null) return;
-            Debug.Log($"[{this.GetType().Name} and {vessel.vesselName}] refreshParts - refreshing!");
+            // Clear the temporary variables
+
+            sortedModules.Clear();
+            tmpVariableSupplierModules.Clear();
 
             List<IKITMod> KITMods;
+
+            bool hasKITModules;
 
             var kitlist = vessel.FindPartModulesImplementing<IKITMod>();
             foreach (var mod in kitlist)
@@ -150,11 +203,12 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
 
                 foreach (ResourceName resource in supmod.ResourcesProvided())
                 {
-                    if (variableSupplierModules.ContainsKey(resource) == false)
+                    if (tmpVariableSupplierModules.ContainsKey(resource) == false)
                     {
-                        variableSupplierModules[resource] = new SortedDictionary<ResourcePriorityValue, List<IKITVariableSupplier>>();
+                        tmpVariableSupplierModules[resource] = new SortedDictionary<ResourcePriorityValue, List<IKITVariableSupplier>>();
                     }
-                    var modules = variableSupplierModules[resource];
+                    var modules = tmpVariableSupplierModules[resource];
+
                     if (modules.ContainsKey(priority) == false)
                     {
                         modules[priority] = new List<IKITVariableSupplier>(16);
@@ -184,65 +238,21 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
 
             foreach (List<IKITMod> list in sortedModules.Values)
             {
-                activeKITModules.AddRange(list);
+                moduleList.AddRange(list);
             }
-            */
-        }
 
-        /// <summary>
-        /// FixedUpdate() triggers the ExecuteKITModules() function call above. It implements automatic catch up processing for each module.
-        /// </summary>
-        public void FixedUpdate()
-        {
-            /*
-            if (!vessel.loaded)
+            foreach (var resource in tmpVariableSupplierModules.Keys)
             {
-                catchUpNeeded = true;
-                return;
+                variableSupplierModules[resource] = new List<IKITVariableSupplier>(16);
+
+                foreach(var list in tmpVariableSupplierModules[resource].Values)
+                {
+                    variableSupplierModules[resource].AddRange(list);
+                }
             }
-
-            if (!HighLogic.LoadedSceneIsFlight || vessel.vesselType == VesselType.SpaceObject ||
-                vessel.isEVA || vessel.vesselType == VesselType.Debris) return;
-
-            // if (lastExecuted == 0) catchUpNeeded = false;
-            var deltaTime = lastExecuted - Planetarium.GetUniversalTime();
-            lastExecuted = Planetarium.GetUniversalTime();
-
-            GatherResources();
-
-            if (needsRefresh) RefreshActiveModules();
-            if (hasKITModules == false) return;
-
-            inExecuteKITModules = true;
-
-            if (catchUpNeeded)
-            {
-                Debug.Log($"[KITResourceManager] catching up with a delta of {deltaTime}");
-
-                ExecuteKITModules(deltaTime);
-
-                catchUpNeeded = false;
-            }
-
-            ExecuteKITModules(TimeWarp.fixedDeltaTime);
-
-            DisperseResources();
-
-            inExecuteKITModules = false;
-            */
         }
 
-        bool IVesselResources.VesselModified()
-        {
-            throw new NotImplementedException();
-        }
-
-        void IVesselResources.VesselKITModules(ref List<IKITMod> moduleList, ref Dictionary<ResourceName, List<IKITVariableSupplier>> variableSupplierModules)
-        {
-            throw new NotImplementedException();
-        }
-
-        void GatherResources(ref Dictionary<ResourceName, double> available)
+        void GatherResources(ref Dictionary<ResourceName, double> amounts, ref Dictionary<ResourceName, double> maxAmounts)
         {
             foreach (var part in vessel.Parts)
             {
@@ -257,12 +267,13 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
                         continue;
                     }
 
-                    if (available.ContainsKey(resourceID) == false)
+                    if (amounts.ContainsKey(resourceID) == false)
                     {
-                        available[resourceID] = available[resourceID] = 0;
+                        amounts[resourceID] = maxAmounts[resourceID] = 0;
                     }
 
-                    available[resourceID] += resource.amount;
+                    amounts[resourceID] += resource.amount;
+                    maxAmounts[resourceID] += resource.maxAmount;
                 }
             }
         }
@@ -288,6 +299,11 @@ namespace KerbalInterstellarTechnologies.ResourceManagement
                     resource.amount = tmp;
                 }
             }
+        }
+
+        public void OnKITProcessingFinished(IResourceManager resourceManager)
+        {
+            // 
         }
     }
 
